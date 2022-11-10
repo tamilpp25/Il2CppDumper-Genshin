@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Il2CppDumper
 {
@@ -39,6 +40,9 @@ namespace Il2CppDumper
         public Il2CppRGCTXDefinition[] rgctxEntries;
 
         private Dictionary<uint, string> stringCache = new Dictionary<uint, string>();
+
+        private Dictionary<string, string> nameTranslation = new Dictionary<string, string>();
+        private Regex nameTranslationMemberRegex = new Regex(@".+\/<(.+)>", RegexOptions.Compiled);
 
         public Metadata(Stream stream) : base(stream)
         {
@@ -165,6 +169,32 @@ namespace Il2CppDumper
                         }
                     }
                 }
+
+                string[] nameTranslationFile = new string[0];
+
+                try
+                {
+                    nameTranslationFile = File.ReadAllLines("nameTranslation.txt");
+                }
+                catch (FileNotFoundException e)
+                {
+                    Console.WriteLine("Name translation file not found! Output will be obfuscated");
+                }
+
+                foreach (var line in nameTranslationFile)
+                {
+                    if (line.StartsWith("#"))
+                        continue;
+
+                    var split = line.Split('⇨');
+
+                    if (split.Length != 2)
+                        throw new NotSupportedException(string.Format("Unexpected split len {0}", split.Length));
+
+                    nameTranslation.Add(split[0], split[1]);
+                }
+
+                Console.WriteLine("Loaded {0} lookup values", nameTranslation.Count);
             }
             if (Version <= 24.1)
             {
@@ -196,7 +226,7 @@ namespace Il2CppDumper
         {
             if (!stringCache.TryGetValue(index, out var result))
             {
-                result = ReadStringToNull(header.stringOffset + index);
+                result = LookupNameTranslation(ReadStringToNull(header.stringOffset + index));
                 stringCache.Add(index, result);
             }
             return result;
@@ -332,6 +362,20 @@ namespace Il2CppDumper
                         return 0;
                 }
             }
+        }
+
+        public string LookupNameTranslation(string obfuscated)
+        {
+            string original;
+            if (nameTranslation.TryGetValue(obfuscated, out original))
+            {
+                Match m = nameTranslationMemberRegex.Match(original);
+                if (m.Success)
+                    return m.Groups[1].Value;
+                //return original.Replace('/', '.');
+                return original.Split('/').Last();
+            }
+            return obfuscated;
         }
     }
 }

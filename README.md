@@ -12,6 +12,8 @@ Unity il2cpp reverse engineer
 
 ## Features
 
+* Apply nameTranslation.txt to dump by placing the file in the root folder of the exe to generated deobfuscated output
+
 * Complete DLL restore (except code), can be used to extract `MonoBehaviour` and `MonoScript`
 * Supports ELF, ELF64, Mach-O, PE, NSO and WASM format
 * Supports Unity 5.3 - 2021.3
